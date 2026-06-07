@@ -1,0 +1,34 @@
+name: Windows RDP via Cloudflare
+
+on:
+  workflow_dispatch:
+
+jobs:
+  rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: Enable RDP
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "Cloudflare@2024" -Force)
+          net user runneradmin /active:yes
+      
+      - name: Download Cloudflared
+        run: |
+          Invoke-WebRequest https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe -OutFile cloudflared.exe
+      
+      - name: Create Cloudflare Tunnel
+        run: |
+          & .\cloudflared.exe tunnel --url rdp://localhost:3389 --no-autoupdate
+      
+      - name: Keep Alive
+        run: |
+          Write-Host "RDP session active - URL above is your connection address"
+          Write-Host "Username: runneradmin"
+          Write-Host "Password: Cloudflare@2024"
+          while ($true) {
+            Start-Sleep -Seconds 300
+          }
